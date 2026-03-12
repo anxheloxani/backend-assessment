@@ -1,132 +1,229 @@
-# Backend Assessment — Multi-Tenant Task Management API
+Task Management Backend API
 
-A RESTful backend API built with Node.js, Express, TypeScript, and PostgreSQL.
+This project is a backend task management system built with Node.js, Express, TypeScript, and PostgreSQL.
+It supports organizations, users, projects, and tasks with workflow validation, audit logging, and role-based access control.
 
-## Tech Stack
+The goal of this project was to design a clean backend architecture and implement a relational data model with real-world features like task workflows and activity tracking.
 
-- Node.js + Express
-- TypeScript
-- PostgreSQL (Docker)
-- JWT Authentication
-- bcryptjs, pino, zod
+Tech Stack
 
-## Features
+Backend:
 
-- Multi-tenant architecture (organizations)
-- JWT authentication
-- Role-based access control (admin, manager, member)
-- Project and task management
-- Workflow engine with validated status transitions (todo → in_progress → review → done)
-- Transactional status updates with history tracking
-- Audit logging with JSONB metadata
-- Soft delete on tasks
-- Optimistic concurrency (version field)
-- Async background job worker with PostgreSQL job queue
-- Correlation ID middleware
-- Centralized error handling
-- SQL migrations
-- Services/repositories architecture
+Node.js
 
-## Getting Started
+Express
 
-### Prerequisites
+TypeScript
 
-- Node.js 18+
-- Docker
+Database:
 
-### Setup
+PostgreSQL
 
-1. Clone the repo
-```bash
-  git clone https://github.com/anxheloxani/backend-assessment
-cd backend-assessment
-```
+Tools:
 
-2. Install dependencies
-```bash
-   npm install
-```
+Docker (for PostgreSQL)
 
-3. Start PostgreSQL with Docker
-```bash
-   docker run --name backend-postgres \
-     -e POSTGRES_USER=postgres \
-     -e POSTGRES_PASSWORD=postgres \
-     -e POSTGRES_DB=assessment_db \
-     -p 5432:5432 -d postgres:15
-```
+ts-node-dev
 
-4. Create a `.env` file
-```
-   PORT=3000
-   DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/assessment_db
-   JWT_SECRET=supersecretkey123
-```
+dotenv
 
-5. Run migrations
-```bash
-   npm run migrate
-```
+Project Structure
+src
+ ├── controllers
+ ├── routes
+ ├── db
+ │    ├── migrations
+ │    └── seed scripts
+ ├── middlewares
+ └── utils
 
-6. Start the server
-```bash
-   npm run dev
-```
+The API follows a simple layered structure:
 
-7. Start the background worker (separate terminal)
-```bash
-   npm run worker
-```
+routes → controllers → database
 
-## API Endpoints
+Routes define endpoints, controllers contain the logic, and the database layer handles SQL queries.
 
-### Auth
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | /auth/login | Login and receive JWT |
+Database Design
 
-### Organizations
-| Method | Path | Role | Description |
-|--------|------|------|-------------|
-| POST | /organizations | public | Create organization |
-| PATCH | /organizations/:id/status | admin | Suspend or activate org |
+Main tables:
 
-### Users
-| Method | Path | Role | Description |
-|--------|------|------|-------------|
-| POST | /organizations/:orgId/users | admin | Create user |
-| PATCH | /users/:id/role | admin | Update user role |
-| PATCH | /users/:id/deactivate | admin | Deactivate user and unassign tasks |
+organizations
+users
+projects
+tasks
+task_workflows
+audit_logs
 
-### Projects
-| Method | Path | Role | Description |
-|--------|------|------|-------------|
-| GET | /projects | all | List projects (paginated) |
-| POST | /projects | admin, manager | Create project |
-| PATCH | /projects/:id | admin, manager | Update project |
-| PATCH | /projects/:id/archive | admin, manager | Archive project |
+Relationships:
 
-### Tasks
-| Method | Path | Role | Description |
-|--------|------|------|-------------|
-| POST | /projects/:projectId/tasks | admin, manager | Create task |
-| PATCH | /tasks/:id/status | all | Update task status |
-| PATCH | /tasks/:id/assign | admin, manager | Assign task |
-| DELETE | /tasks/:id | admin, manager | Soft delete task |
+Organization
+   ├── Users
+   └── Projects
+           └── Tasks
 
-## Architecture
-```
-routes → controllers → services → repositories → database
-```
+Additional tracking tables:
 
-- **Routes** — define endpoints and apply auth/role middleware
-- **Controllers** — handle HTTP request/response, no business logic
-- **Services** — business logic, transactions, workflow validation
-- **Repositories** — direct database queries
+task_workflows → stores task status transitions
 
-## Workflow Transitions
-```
+audit_logs → stores system activity events
+
+Task Workflow
+
+Tasks follow a strict status workflow:
+
 todo → in_progress → review → done
-```
 
-Invalid transitions are rejected with a 400 error.
+Invalid transitions are rejected by the API.
+
+For example:
+
+todo → done  
+
+Every status change is recorded in the task_workflows table.
+
+Audit Logging
+
+Important actions are recorded in audit_logs.
+
+Examples include:
+
+task status changes
+
+task assignment
+
+user creation
+
+Example audit log entry:
+
+entity_type: task
+action: status_changed
+metadata: { from: "in_progress", to: "review" }
+
+This allows tracking changes and debugging activity.
+
+Role-Based Access Control (RBAC)
+
+The system supports three roles:
+
+admin
+manager
+member
+
+Permissions:
+
+Role	Permissions
+admin	full access
+manager	manage projects and tasks
+member	update task status
+
+RBAC is implemented using middleware that checks the request header:
+
+x-user-role
+
+Example:
+
+x-user-role: admin
+
+In a production system, this role would normally come from a JWT token.
+
+API Endpoints
+Organizations
+
+Create an organization
+
+POST /organizations
+
+Example:
+
+curl -X POST http://localhost:3000/organizations \
+-H "Content-Type: application/json" \
+-d '{"name":"Acme Inc"}'
+Users
+
+Create a user within an organization
+
+POST /organizations/:orgId/users
+Projects
+
+Create a project
+
+POST /projects
+
+Requires role:
+
+admin or manager
+Tasks
+
+Create a task
+
+POST /projects/:projectId/tasks
+Update Task Status
+PATCH /tasks/:id/status
+
+Example:
+
+curl -X PATCH http://localhost:3000/tasks/{taskId}/status \
+-H "Content-Type: application/json" \
+-d '{
+"status":"in_progress",
+"changed_by":"USER_ID"
+}'
+Assign Task
+PATCH /tasks/:id/assign
+
+This endpoint updates the assigned user and records the change in the audit logs.
+
+Local Setup
+Install dependencies
+npm install
+Start PostgreSQL with Docker
+docker run -d \
+--name backend-postgres \
+-e POSTGRES_PASSWORD=postgres \
+-e POSTGRES_DB=assessment_db \
+-p 5432:5432 \
+postgres:15
+Run database migrations
+npm run migrate
+Seed sample data
+npm run seed
+Start the server
+npm run dev
+
+Server runs at:
+
+http://localhost:3000
+Testing
+
+Endpoints can be tested using:
+
+curl
+
+Postman
+
+Insomnia
+
+Health check endpoint:
+
+GET /health
+
+Response:
+
+{ "ok": true }
+Possible Improvements
+
+Future improvements could include:
+
+JWT authentication
+
+pagination and filtering
+
+background job processing
+
+real-time notifications
+
+automated tests
+
+Author
+
+Angjelos Xani
