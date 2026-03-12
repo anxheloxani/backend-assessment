@@ -38,7 +38,8 @@ A RESTful backend API built with Node.js, Express, TypeScript, and PostgreSQL.
 
 1. Clone the repo
 ```bash
-   git clone https://github.com/anxheloxani/backend-assessmen cd backend-assessment
+  git clone https://github.com/anxheloxani/backend-assessment
+cd backend-assessment
 ```
 
 2. Install dependencies
