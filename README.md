@@ -119,7 +119,7 @@ cd backend-assessment
 routes → controllers → services → repositories → database
 ```
 
-- ** — define endpoints and apply auth/role middleware
+- **Routes** — define endpoints and apply auth/role middleware
 - **Controllers** — handle HTTP request/response, no business logic
 - **Services** — business logic, transactions, workflow validation
 - **Repositories** — direct database queries
